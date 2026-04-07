@@ -1,0 +1,477 @@
+// AnyFix – Prisma Schema (PostgreSQL)
+// Изпълни: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────
+
+enum UserRole {
+  CLIENT
+  MASTER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum MasterLevel {
+  STAJANT      // Ниво 1
+  MAJSTOR      // Ниво 2
+  PRO_MAJSTOR  // Ниво 3
+  ELIT         // Ниво 4
+  CERTIFIED    // Ниво 5
+}
+
+enum VerificationStatus {
+  PENDING
+  DOCUMENTS_SUBMITTED
+  UNDER_REVIEW
+  INTERVIEW_SCHEDULED
+  APPROVED
+  REJECTED
+}
+
+enum ServiceCategory {
+  ELECTRIC
+  VIK
+  PAINTING
+  MASONRY
+  TILES
+  JOINERY
+  FLOORING
+  HANDYMAN
+  HVAC
+  INSULATION
+}
+
+enum OrderStatus {
+  DRAFT
+  PUBLISHED
+  OFFERS_RECEIVED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  DISPUTED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  HELD_IN_ESCROW
+  RELEASED
+  REFUNDED
+  FAILED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_CLIENT
+  RESOLVED_MASTER
+  ESCALATED
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  ELITE
+}
+
+// ─── MODELS ──────────────────────────────────────────────
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  phone         String?    @unique
+  passwordHash  String
+  role          UserRole   @default(CLIENT)
+  status        UserStatus @default(ACTIVE)
+  firebaseUid   String?    @unique
+  stripeCustomerId String? @unique
+
+  firstName     String
+  lastName      String
+  avatarUrl     String?
+
+  emailVerified Boolean    @default(false)
+  phoneVerified Boolean    @default(false)
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  lastLoginAt   DateTime?
+
+  // Relations
+  masterProfile    MasterProfile?
+  ordersAsClient   Order[]         @relation("ClientOrders")
+  reviews          Review[]        @relation("ClientReviews")
+  notifications    Notification[]
+  sessions         Session[]
+  activityLogs     ActivityLog[]
+
+  @@index([email])
+  @@index([phone])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("sessions")
+}
+
+model MasterProfile {
+  id                  String             @id @default(uuid())
+  userId              String             @unique
+  bio                 String?
+  yearsExperience     Int                @default(0)
+  level               MasterLevel        @default(STAJANT)
+  verificationStatus  VerificationStatus @default(PENDING)
+  subscriptionPlan    SubscriptionPlan   @default(FREE)
+  subscriptionExpiresAt DateTime?
+
+  // Ratings
+  averageRating       Float              @default(0)
+  totalReviews        Int                @default(0)
+  completedOrders     Int                @default(0)
+  disputeCount        Int                @default(0)
+
+  // Stripe
+  stripeAccountId     String?            @unique
+
+  // Service area
+  city                String
+  radiusKm            Int                @default(15)
+  latitude            Float?
+  longitude           Float?
+
+  isAvailable         Boolean            @default(true)
+  responseTimeHours   Float              @default(4)
+
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories          MasterCategory[]
+  documents           VerificationDocument[]
+  portfolio           PortfolioItem[]
+  offers              Offer[]
+  reviewsReceived     Review[]           @relation("MasterReviews")
+  schedule            MasterSchedule[]
+
+  @@index([city])
+  @@index([level])
+  @@index([verificationStatus])
+  @@map("master_profiles")
+}
+
+model MasterCategory {
+  id              String          @id @default(uuid())
+  masterProfileId String
+  category        ServiceCategory
+  pricePerHour    Float?
+  description     String?
+
+  masterProfile   MasterProfile   @relation(fields: [masterProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([masterProfileId, category])
+  @@map("master_categories")
+}
+
+model VerificationDocument {
+  id              String          @id @default(uuid())
+  masterProfileId String
+  type            String          // ID_CARD | CRIMINAL_RECORD | DIPLOMA | PORTFOLIO
+  fileUrl         String          // S3 URL (encrypted)
+  fileName        String
+  status          String          @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewNote      String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  expiresAt       DateTime?
+  uploadedAt      DateTime        @default(now())
+
+  masterProfile   MasterProfile   @relation(fields: [masterProfileId], references: [id], onDelete: Cascade)
+
+  @@index([masterProfileId])
+  @@map("verification_documents")
+}
+
+model PortfolioItem {
+  id              String        @id @default(uuid())
+  masterProfileId String
+  title           String
+  description     String?
+  category        ServiceCategory
+  beforeImageUrl  String
+  afterImageUrl   String
+  completedAt     DateTime
+  createdAt       DateTime      @default(now())
+
+  masterProfile   MasterProfile @relation(fields: [masterProfileId], references: [id], onDelete: Cascade)
+
+  @@map("portfolio_items")
+}
+
+model MasterSchedule {
+  id              String        @id @default(uuid())
+  masterProfileId String
+  dayOfWeek       Int           // 0=Sun, 6=Sat
+  startTime       String        // "08:00"
+  endTime         String        // "18:00"
+  isAvailable     Boolean       @default(true)
+
+  masterProfile   MasterProfile @relation(fields: [masterProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([masterProfileId, dayOfWeek])
+  @@map("master_schedules")
+}
+
+model Order {
+  id              String          @id @default(uuid())
+  clientId        String
+  category        ServiceCategory
+  title           String
+  description     String
+  address         String
+  city            String
+  latitude        Float?
+  longitude       Float?
+  urgency         String          @default("FLEXIBLE") // URGENT | WITHIN_3_DAYS | FLEXIBLE
+  budget          Float?
+  status          OrderStatus     @default(DRAFT)
+
+  // Photos (stored in S3)
+  photoUrls       String[]        @default([])
+
+  // Dates
+  preferredDateFrom DateTime?
+  preferredDateTo   DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  client          User            @relation("ClientOrders", fields: [clientId], references: [id])
+  offers          Offer[]
+  acceptedOffer   Offer?          @relation("AcceptedOffer", fields: [acceptedOfferId], references: [id])
+  acceptedOfferId String?         @unique
+  payment         Payment?
+  dispute         Dispute?
+  review          Review?
+  messages        Message[]
+  progressPhotos  ProgressPhoto[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([category])
+  @@index([city])
+  @@map("orders")
+}
+
+model Offer {
+  id              String        @id @default(uuid())
+  orderId         String
+  masterProfileId String
+  price           Float
+  description     String
+  estimatedHours  Float?
+  availableFrom   DateTime?
+  status          String        @default("PENDING") // PENDING | ACCEPTED | REJECTED | WITHDRAWN
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  masterProfile   MasterProfile @relation(fields: [masterProfileId], references: [id])
+  acceptedForOrder Order?       @relation("AcceptedOffer")
+
+  @@unique([orderId, masterProfileId])
+  @@index([orderId])
+  @@index([masterProfileId])
+  @@map("offers")
+}
+
+model Payment {
+  id                    String        @id @default(uuid())
+  orderId               String        @unique
+  amount                Float         // Total amount
+  platformFee           Float         // AnyFix commission
+  masterAmount          Float         // Amount to master
+  currency              String        @default("EUR")
+  status                PaymentStatus @default(PENDING)
+
+  // Stripe
+  stripePaymentIntentId String?       @unique
+  stripeTransferId      String?
+
+  // Escrow
+  heldAt                DateTime?
+  releasedAt            DateTime?
+  refundedAt            DateTime?
+  refundReason          String?
+
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  order                 Order         @relation(fields: [orderId], references: [id])
+
+  @@index([status])
+  @@map("payments")
+}
+
+model Message {
+  id          String    @id @default(uuid())
+  orderId     String
+  senderId    String
+  content     String
+  type        String    @default("TEXT") // TEXT | IMAGE | SYSTEM
+  imageUrl    String?
+  isRead      Boolean   @default(false)
+
+  // Anti-fraud flags
+  flagged     Boolean   @default(false)
+  flagReason  String?
+
+  createdAt   DateTime  @default(now())
+
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model ProgressPhoto {
+  id          String    @id @default(uuid())
+  orderId     String
+  uploaderId  String
+  type        String    // BEFORE | PROGRESS | AFTER
+  imageUrl    String
+  caption     String?
+  takenAt     DateTime
+  uploadedAt  DateTime  @default(now())
+
+  // GPS metadata
+  latitude    Float?
+  longitude   Float?
+
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("progress_photos")
+}
+
+model Review {
+  id              String        @id @default(uuid())
+  orderId         String        @unique
+  clientId        String
+  masterProfileId String
+  rating          Int           // 1-5
+  comment         String?
+  qualityScore    Int?          // 1-5
+  timelinessScore Int?          // 1-5
+  communicationScore Int?       // 1-5
+  isPublic        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  // Master reply
+  masterReply     String?
+  masterRepliedAt DateTime?
+
+  order         Order         @relation(fields: [orderId], references: [id])
+  client        User          @relation("ClientReviews", fields: [clientId], references: [id])
+  masterProfile MasterProfile @relation("MasterReviews", fields: [masterProfileId], references: [id])
+
+  @@index([masterProfileId])
+  @@index([clientId])
+  @@map("reviews")
+}
+
+model Dispute {
+  id          String        @id @default(uuid())
+  orderId     String        @unique
+  reportedBy  String        // userId
+  reason      String
+  description String
+  status      DisputeStatus @default(OPEN)
+  resolution  String?
+  resolvedBy  String?
+  resolvedAt  DateTime?
+  evidenceUrls String[]     @default([])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  order       Order         @relation(fields: [orderId], references: [id])
+
+  @@index([status])
+  @@map("disputes")
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  type      String    // ORDER | OFFER | PAYMENT | REVIEW | SYSTEM
+  data      Json?
+  isRead    Boolean   @default(false)
+  sentAt    DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id        String    @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@map("activity_logs")
+}
+
+model Category {
+  id          String          @id @default(uuid())
+  key         ServiceCategory @unique
+  nameBg      String
+  nameEn      String
+  description String?
+  iconEmoji   String
+  isActive    Boolean         @default(true)
+  sortOrder   Int             @default(0)
+
+  @@map("categories")
+}
