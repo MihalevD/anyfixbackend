@@ -29,6 +29,10 @@ import { prisma, redis }  from './lib/prisma';
 const app  = express();
 const PORT = process.env.PORT || 4000;
 
+// Trust the platform proxy (Railway/Vercel/Render put one in front).
+// Required so express-rate-limit sees the real client IP via X-Forwarded-For.
+app.set('trust proxy', 1);
+
 // ─── SECURITY MIDDLEWARE ──────────────────────────────────
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
