@@ -4,8 +4,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { authenticate, requireRole } from '../middleware/auth';
-import { validate } from '../middleware/validate';
+import { authenticate, requireRole, validate } from '../middleware/auth';
 import { notifyMasters } from '../services/email';
 import { calculateCommission } from '../services/stripe';
 
@@ -244,7 +243,7 @@ ordersRouter.post('/:id/accept-offer', authenticate, requireRole('CLIENT'),
       if (!order.offers[0])         return res.status(404).json({ error: 'Офертата не е намерена' });
 
       const offer = order.offers[0];
-      const { clientFee, masterAmount } = calculateCommission(offer.price);
+      const { platformFee, masterAmount } = calculateCommission(offer.price);
 
       await prisma.$transaction([
         prisma.order.update({
@@ -259,8 +258,8 @@ ordersRouter.post('/:id/accept-offer', authenticate, requireRole('CLIENT'),
         prisma.payment.create({
           data: {
             orderId:     order.id,
-            amount:      offer.price + clientFee,
-            platformFee: clientFee,
+            amount:      offer.price + platformFee,
+            platformFee: platformFee,
             masterAmount,
             status:      'PENDING',
           },

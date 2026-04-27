@@ -11,16 +11,16 @@ async function main() {
 
   // ─── Categories ────────────────────────────────────────
   const categories = [
-    { key:'ELECTRIC',   nameБг:'Електро',       nameEn:'Electric',   iconEmoji:'⚡', sortOrder:1 },
-    { key:'VIK',        nameБг:'ВиК',            nameEn:'Plumbing',   iconEmoji:'🔧', sortOrder:2 },
-    { key:'PAINTING',   nameБг:'Боядисване',     nameEn:'Painting',   iconEmoji:'🎨', sortOrder:3 },
-    { key:'MASONRY',    nameБг:'Зидария',        nameEn:'Masonry',    iconEmoji:'🧱', sortOrder:4 },
-    { key:'TILES',      nameБг:'Плочки',         nameEn:'Tiles',      iconEmoji:'🏗️', sortOrder:5 },
-    { key:'JOINERY',    nameБг:'Дограма',        nameEn:'Joinery',    iconEmoji:'🪟', sortOrder:6 },
-    { key:'FLOORING',   nameБг:'Паркет',         nameEn:'Flooring',   iconEmoji:'🪵', sortOrder:7 },
-    { key:'HANDYMAN',   nameБг:'Handyman',       nameEn:'Handyman',   iconEmoji:'🔨', sortOrder:8 },
-    { key:'HVAC',       nameБг:'Климатизация',   nameEn:'HVAC',       iconEmoji:'❄️', sortOrder:9, isActive:false },
-    { key:'INSULATION', nameБг:'Топлоизолация',  nameEn:'Insulation', iconEmoji:'🏠', sortOrder:10, isActive:false },
+    { key:'ELECTRIC',   nameBg:'Електро',       nameEn:'Electric',   iconEmoji:'⚡', sortOrder:1 },
+    { key:'VIK',        nameBg:'ВиК',            nameEn:'Plumbing',   iconEmoji:'🔧', sortOrder:2 },
+    { key:'PAINTING',   nameBg:'Боядисване',     nameEn:'Painting',   iconEmoji:'🎨', sortOrder:3 },
+    { key:'MASONRY',    nameBg:'Зидария',        nameEn:'Masonry',    iconEmoji:'🧱', sortOrder:4 },
+    { key:'TILES',      nameBg:'Плочки',         nameEn:'Tiles',      iconEmoji:'🏗️', sortOrder:5 },
+    { key:'JOINERY',    nameBg:'Дограма',        nameEn:'Joinery',    iconEmoji:'🪟', sortOrder:6 },
+    { key:'FLOORING',   nameBg:'Паркет',         nameEn:'Flooring',   iconEmoji:'🪵', sortOrder:7 },
+    { key:'HANDYMAN',   nameBg:'Handyman',       nameEn:'Handyman',   iconEmoji:'🔨', sortOrder:8 },
+    { key:'HVAC',       nameBg:'Климатизация',   nameEn:'HVAC',       iconEmoji:'❄️', sortOrder:9, isActive:false },
+    { key:'INSULATION', nameBg:'Топлоизолация',  nameEn:'Insulation', iconEmoji:'🏠', sortOrder:10, isActive:false },
   ];
 
   for (const cat of categories) {

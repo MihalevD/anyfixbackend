@@ -3,13 +3,21 @@
   "version": "1.0.0",
   "description": "AnyFix API Server",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/index.js",
+    "postinstall": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate",
     "prisma:seed": "ts-node prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
@@ -43,6 +51,7 @@
     "@types/node": "^20.10.0",
     "@types/uuid": "^9.0.7",
     "prisma": "^5.7.0",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.2"
   }

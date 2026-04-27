@@ -466,7 +466,7 @@ model ActivityLog {
 model Category {
   id          String          @id @default(uuid())
   key         ServiceCategory @unique
-  nameBg      String
+  nameBg      String  @map("name_bg")
   nameEn      String
   description String?
   iconEmoji   String

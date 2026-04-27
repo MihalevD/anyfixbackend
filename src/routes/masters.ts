@@ -7,18 +7,18 @@ import multer from 'multer';
 import multerS3 from 'multer-s3';
 import { S3Client } from '@aws-sdk/client-s3';
 import { prisma } from '../lib/prisma';
-import { authenticate, requireRole } from '../middleware/auth';
-import { validate } from '../middleware/validate';
+import { authenticate, requireRole, validate } from '../middleware/auth';
 import { createMasterStripeAccount } from '../services/stripe';
 import { sendEmail } from '../services/email';
 
 export const mastersRouter = Router();
 
-// ─── S3 Upload Config ─────────────────────────────────────
+// ─── S3 Upload Config (lazy: only init when AWS_BUCKET_NAME is set) ─────
 
-const s3 = new S3Client({ region: process.env.AWS_REGION! });
+const HAS_S3 = !!process.env.AWS_BUCKET_NAME;
+const s3 = HAS_S3 ? new S3Client({ region: process.env.AWS_REGION || 'eu-west-1' }) : null;
 
-const docUpload = multer({
+const docUpload   = HAS_S3 && s3 ? multer({
   storage: multerS3({
     s3,
     bucket: process.env.AWS_BUCKET_NAME!,
@@ -27,16 +27,16 @@ const docUpload = multer({
       cb(null, `verification/${req.user.userId}/${Date.now()}-${file.fieldname}.${ext}`);
     },
     contentType: multerS3.AUTO_CONTENT_TYPE,
-    acl: 'private',   // Documents are PRIVATE – never public
+    acl: 'private',
   }),
-  limits: { fileSize: 10 * 1024 * 1024 },  // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
     const allowed = ['image/jpeg','image/png','application/pdf'];
     cb(null, allowed.includes(file.mimetype));
   },
-});
+}) : multer();
 
-const photoUpload = multer({
+const photoUpload = HAS_S3 && s3 ? multer({
   storage: multerS3({
     s3,
     bucket: process.env.AWS_BUCKET_NAME!,
@@ -45,10 +45,10 @@ const photoUpload = multer({
       cb(null, `portfolio/${req.user.userId}/${Date.now()}.${ext}`);
     },
     contentType: multerS3.AUTO_CONTENT_TYPE,
-    acl: 'public-read',  // Portfolio photos are PUBLIC
+    acl: 'public-read',
   }),
-  limits: { fileSize: 20 * 1024 * 1024 },  // 20MB
-});
+  limits: { fileSize: 20 * 1024 * 1024 },
+}) : multer();
 
 // ─── GET /api/masters ─────────────────────────────────────
 // Public – за клиентите да разглеждат майстори

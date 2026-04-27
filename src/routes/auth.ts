@@ -5,11 +5,9 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { prisma } from '../lib/prisma';
-import { redis } from '../lib/redis';
+import { prisma, redis } from '../lib/prisma';
 import { sendEmail, sendSMS } from '../services/email';
-import { authenticate } from '../middleware/auth';
-import { validate } from '../middleware/validate';
+import { authenticate, validate } from '../middleware/auth';
 
 export const authRouter = Router();
 
@@ -223,43 +221,4 @@ authRouter.get('/me', authenticate, async (req: any, res: Response) => {
   });
   if (!user) return res.status(404).json({ error: 'User not found' });
   return res.json(user);
-});
-
-// ─── GET /api/auth/verify-email ────────────────────────────
-
-authRouter.get('/verify-email', async (req: Request, res: Response) => {
-  const { token } = req.query;
-  if (!token || typeof token !== 'string') {
-    return res.status(400).json({ error: 'No verification token provided' });
-  }
-
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as any;
-
-    if (!payload.userId) {
-      return res.status(400).json({ error: 'Invalid token format' });
-    }
-
-    // Update user email verification status
-    const user = await prisma.user.update({
-      where: { id: payload.userId },
-      data: { emailVerified: true },
-      select: { id: true, email: true, emailVerified: true },
-    });
-
-    // Log the verification
-    await prisma.activityLog.create({
-      data: {
-        userId: user.id,
-        action: 'EMAIL_VERIFIED',
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
-      },
-    });
-
-    return res.json({ success: true, message: 'Email verified successfully' });
-  } catch (err) {
-    console.error('[auth/verify-email]', err);
-    return res.status(400).json({ error: 'Invalid or expired verification token' });
-  }
 });

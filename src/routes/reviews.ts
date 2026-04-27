@@ -7,8 +7,7 @@ import multer from 'multer';
 import multerS3 from 'multer-s3';
 import { S3Client } from '@aws-sdk/client-s3';
 import { prisma } from '../lib/prisma';
-import { authenticate, requireRole } from '../middleware/auth';
-import { validate } from '../middleware/validate';
+import { authenticate, requireRole, validate } from '../middleware/auth';
 
 // ═══════════════════════════════════════════════════════════
 // REVIEWS
@@ -192,8 +191,9 @@ offersRouter.get('/', authenticate, async (req: any, res: Response) => {
 // ═══════════════════════════════════════════════════════════
 export const uploadRouter = Router();
 
-const s3 = new S3Client({ region: process.env.AWS_REGION! });
-const upload = multer({
+const HAS_S3 = !!process.env.AWS_BUCKET_NAME;
+const s3 = HAS_S3 ? new S3Client({ region: process.env.AWS_REGION || 'eu-west-1' }) : null;
+const upload = HAS_S3 && s3 ? multer({
   storage: multerS3({
     s3,
     bucket: process.env.AWS_BUCKET_NAME!,
@@ -208,14 +208,19 @@ const upload = multer({
   fileFilter: (_, file, cb) => {
     cb(null, ['image/jpeg','image/png','image/webp'].includes(file.mimetype));
   },
-});
+}) : multer();
 
-uploadRouter.post('/image', authenticate, upload.single('image'), (req: any, res: Response) => {
+function s3Required(_req: any, res: Response, next: any) {
+  if (!HAS_S3) return res.status(503).json({ error: 'File uploads are not configured (AWS_BUCKET_NAME missing).' });
+  next();
+}
+
+uploadRouter.post('/image', authenticate, s3Required, upload.single('image'), (req: any, res: Response) => {
   if (!req.file) return res.status(400).json({ error: 'Не е качен файл' });
   return res.json({ url: (req.file as any).location });
 });
 
-uploadRouter.post('/order-photo', authenticate, upload.single('photo'),
+uploadRouter.post('/order-photo', authenticate, s3Required, upload.single('photo'),
   async (req: any, res: Response) => {
     if (!req.file) return res.status(400).json({ error: 'Не е качен файл' });
     const { orderId, type } = req.body;
