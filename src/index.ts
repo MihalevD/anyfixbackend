@@ -87,13 +87,26 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
 // ─── HEALTH CHECK ─────────────────────────────────────────
+// Liveness probe: always 200 if the process is reachable.
+// Dependency status (DB/Redis) is reported in the body but does not gate.
 app.get('/health', async (_req, res) => {
   const out: any = { status: 'ok', timestamp: new Date().toISOString() };
   try { await prisma.$queryRaw`SELECT 1`; out.db = 'ok'; }
-  catch (e) { out.db = 'error'; out.dbError = String(e); out.status = 'degraded'; }
+  catch (e) { out.db = 'error'; out.dbError = String(e); }
   try { if (redis) { await redis.ping(); out.redis = 'ok'; } else { out.redis = 'disabled'; } }
   catch (e) { out.redis = 'error'; }
-  res.status(out.status === 'ok' ? 200 : 503).json(out);
+  res.status(200).json(out);
+});
+
+// Readiness probe: 200 only when all dependencies are healthy. Use this for monitoring.
+app.get('/ready', async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    if (redis) await redis.ping();
+    res.status(200).json({ status: 'ready' });
+  } catch (e) {
+    res.status(503).json({ status: 'not_ready', error: String(e) });
+  }
 });
 
 app.get('/', (_req, res) => res.json({ name: 'AnyFix API', version: '1.0.0', docs: '/health' }));
